@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  paddlex:
+    image: paddlex-ocr:latest
+    container_name: paddlex-ocr
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/data/models
+      - ./pipeline.yaml:/data/pipeline.yaml
+    environment:
+      PIPELINE_FILE: /data/pipeline.yaml
+      DEFAULT_PIPELINE: OCR
+      DEVICE: cpu
+      PORT: 8080
+    restart: unless-stopped
