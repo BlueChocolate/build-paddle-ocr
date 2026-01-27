@@ -7,7 +7,7 @@ on:
       - master
     paths:
       - 'Dockerfile'
-      - '.github/workflows/build-paddle-ocr.yml'
+      - '.github/workflows/build-paddle-ocr-docker-image.yml'
       - 'entrypoint.sh'
       - 'docker-compose.yml'
 
