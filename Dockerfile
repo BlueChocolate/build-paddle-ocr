@@ -13,9 +13,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Python 依赖
-RUN pip install --no-cache-dir \
-    paddlepaddle==3.2.2 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/ \
-    paddlex[ocr]
+RUN pip install --no-cache-dir paddlepaddle==3.2.2 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/ \
+ && pip install --no-cache-dir paddlex[ocr]
 
 # 安装 PaddleX 服务化插件
 RUN paddlex --install serving \
