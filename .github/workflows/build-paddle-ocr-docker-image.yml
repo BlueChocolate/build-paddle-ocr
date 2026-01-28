@@ -45,10 +45,10 @@ jobs:
           mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
       - name: Export Docker image as tar
-        run: docker save paddle-ocr:latest -o paddle-ocr-image.tar
+        run: docker save paddle-ocr:latest -o paddle-ocr.tar
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: paddle-ocr-docker-image
-          path: paddle-ocr-image.tar
+          name: paddle-ocr
+          path: paddle-ocr.tar
