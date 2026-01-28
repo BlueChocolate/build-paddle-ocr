@@ -5,7 +5,7 @@ services:
     image: paddlex-ocr:latest
     container_name: paddlex-ocr
     ports:
-      - "8080:8080"
+      - "25601:8080"
     volumes:
       - ./models:/data/models
       - ./pipeline.yaml:/data/pipeline.yaml
