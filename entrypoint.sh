@@ -15,14 +15,14 @@ echo "Listening on: $HOST:$PORT"
 echo "============================="
 
 if [ -f "$PIPELINE_FILE" ]; then
-    echo "✔ Found pipeline config, using file"
+    echo "[INFO] Found pipeline config, using file"
     exec paddlex --serve \
         --pipeline "$PIPELINE_FILE" \
         --device "$DEVICE" \
         --host "$HOST" \
         --port "$PORT"
 else
-    echo "⚠ Pipeline file not found, fallback to pipeline name: $DEFAULT_PIPELINE"
+    echo "[WARN] Pipeline file not found, fallback to pipeline name: $DEFAULT_PIPELINE"
     exec paddlex --serve \
         --pipeline "$DEFAULT_PIPELINE" \
         --device "$DEVICE" \

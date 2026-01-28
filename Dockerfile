@@ -2,7 +2,7 @@ FROM python:3.10-slim-bookworm
 
 WORKDIR /app
 
-# PaddleX / OpenCV 运行时依赖
+# Paddle / OpenCV 运行时依赖
 RUN apt-get update && apt-get install -y \
     libgomp1 \
     libgl1 \
