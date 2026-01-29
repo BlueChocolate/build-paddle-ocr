@@ -4,8 +4,10 @@ services:
     container_name: paddlex-ocr
     ports:
       - "25601:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
-      - /opt/qzwb/paddlex-ocr/paddlex:/root/.paddlex
+      - /opt/qzwb/paddlex-ocr/cache:/root/.paddlex
       - /opt/qzwb/paddlex-ocr/pipeline.yaml:/data/pipeline.yaml
     environment:
       DISABLE_MODEL_SOURCE_CHECK: "True"

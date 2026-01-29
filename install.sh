@@ -63,8 +63,8 @@ for file in "${required_files[@]}"; do
     echo "  [OK] $file"
 done
 
-if [ ! -d "$SCRIPT_DIR/models" ]; then
-    echo -e "${YELLOW}警告: models 目录不存在，将创建空目录${NC}"
+if [ ! -d "$SCRIPT_DIR/cache" ]; then
+    echo -e "${YELLOW}警告: cache 目录不存在，将创建空目录${NC}"
 fi
 
 # 创建安装目录
@@ -81,12 +81,12 @@ echo "  [OK] pipeline.yaml"
 cp -f "$SCRIPT_DIR/$IMAGE_FILE" "$INSTALL_DIR/"
 echo "  [OK] $IMAGE_FILE"
 
-if [ -d "$SCRIPT_DIR/models" ]; then
-    cp -rf "$SCRIPT_DIR/models" "$INSTALL_DIR/"
-    echo "  [OK] models/"
+if [ -d "$SCRIPT_DIR/cache" ]; then
+    cp -rf "$SCRIPT_DIR/cache" "$INSTALL_DIR/"
+    echo "  [OK] cache/"
 else
-    mkdir -p "$INSTALL_DIR/models"
-    echo "  [OK] 创建空的 models/"
+    mkdir -p "$INSTALL_DIR/cache"
+    echo "  [OK] 创建空的 cache/"
 fi
 
 # 加载 Docker 镜像
@@ -144,5 +144,5 @@ echo ""
 echo -e "${YELLOW}说明:${NC}"
 echo "  - 服务已配置为崩溃自动重启 (restart: unless-stopped)"
 echo "  - Docker 开机自启后，容器会自动启动"
-echo "  - 模型文件位于: $INSTALL_DIR/models/"
+echo "  - PaddleX 缓存目录: $INSTALL_DIR/cache/"
 echo ""
