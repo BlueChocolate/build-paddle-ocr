@@ -5,6 +5,7 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 检查是否以 root 权限运行
@@ -17,7 +18,11 @@ fi
 # 定义变量
 INSTALL_DIR="/opt/qzwb/paddlex-ocr"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_FILE="paddlex-ocr.tar"
+
+# 支持的镜像配置
+declare -A IMAGE_FILES
+IMAGE_FILES["hpi"]="paddlex-ocr-hpi.tar"
+IMAGE_FILES["basic"]="paddlex-ocr-basic.tar"
 
 echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}  PaddleX OCR 安装脚本${NC}"
@@ -42,19 +47,91 @@ else
     exit 1
 fi
 
-# 检查端口是否被占用
-echo -e "${YELLOW}[1/7] 检查端口占用...${NC}"
-SERVICE_PORT=25601
-if ss -tuln 2>/dev/null | grep -q ":$SERVICE_PORT " || netstat -tuln 2>/dev/null | grep -q ":$SERVICE_PORT "; then
-    echo -e "${RED}错误: 端口 $SERVICE_PORT 已被占用${NC}"
-    echo "请先停止占用该端口的服务，或修改 docker-compose.yml 中的端口配置"
+# 检测目录中存在的镜像文件
+echo -e "${YELLOW}检测可用的镜像文件...${NC}"
+available_images=()
+for tag in "${!IMAGE_FILES[@]}"; do
+    if [ -f "$SCRIPT_DIR/${IMAGE_FILES[$tag]}" ]; then
+        available_images+=("$tag")
+        echo -e "  ${GREEN}[找到] ${IMAGE_FILES[$tag]} -> paddlex-ocr:$tag${NC}"
+    fi
+done
+
+if [ ${#available_images[@]} -eq 0 ]; then
+    echo -e "${RED}错误: 未找到任何镜像文件${NC}"
+    echo "请确保以下文件之一存在:"
+    for tag in "${!IMAGE_FILES[@]}"; do
+        echo "  - ${IMAGE_FILES[$tag]}"
+    done
     exit 1
 fi
-echo "  [OK] 端口 $SERVICE_PORT 可用"
+
+# 选择要安装的镜像
+if [ ${#available_images[@]} -eq 1 ]; then
+    SELECTED_TAG="${available_images[0]}"
+    echo -e "${BLUE}只检测到一个镜像文件，将自动安装: paddlex-ocr:$SELECTED_TAG${NC}"
+else
+    echo ""
+    echo -e "${BLUE}检测到多个可用镜像，请选择要安装的版本:${NC}"
+    for i in "${!available_images[@]}"; do
+        tag="${available_images[$i]}"
+        echo "  $((i+1)). paddlex-ocr:$tag (${IMAGE_FILES[$tag]})"
+    done
+    echo ""
+    while true; do
+        read -p "请输入选项 [1-${#available_images[@]}]: " choice
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#available_images[@]} ]; then
+            SELECTED_TAG="${available_images[$((choice-1))]}"
+            break
+        else
+            echo -e "${RED}无效的选项，请重新输入${NC}"
+        fi
+    done
+fi
+
+SELECTED_IMAGE_FILE="${IMAGE_FILES[$SELECTED_TAG]}"
+echo ""
+echo -e "${GREEN}已选择: paddlex-ocr:$SELECTED_TAG${NC}"
+
+# 检查是否已有其他版本的容器在运行
+echo -e "${YELLOW}检查已安装的版本...${NC}"
+for tag in "${!IMAGE_FILES[@]}"; do
+    container_name="paddlex-ocr-$tag"
+    if docker ps -a --format '{{.Names}}' | grep -q "^${container_name}$"; then
+        if [ "$tag" != "$SELECTED_TAG" ]; then
+            echo -e "${RED}错误: 检测到已安装其他版本 (paddlex-ocr:$tag)${NC}"
+            echo "请先运行卸载脚本移除已安装的版本:"
+            echo "  sudo bash uninstall.sh"
+            exit 1
+        else
+            echo -e "${YELLOW}检测到相同版本已安装，将进行更新${NC}"
+        fi
+    fi
+done
+echo -e "  ${GREEN}[OK] 版本检查通过${NC}"
+
+# 检查端口是否被占用（排除当前版本的容器）
+echo -e "${YELLOW}[1/7] 检查端口占用...${NC}"
+SERVICE_PORT=25601
+current_container="paddlex-ocr-$SELECTED_TAG"
+
+# 检查端口占用，但排除当前要安装的容器
+if ss -tuln 2>/dev/null | grep -q ":$SERVICE_PORT " || netstat -tuln 2>/dev/null | grep -q ":$SERVICE_PORT "; then
+    # 检查是否是当前容器占用的端口
+    if docker ps --format '{{.Names}}' | grep -q "^${current_container}$"; then
+        echo "  [OK] 端口 $SERVICE_PORT 被当前容器使用，将进行更新"
+    else
+        echo -e "${RED}错误: 端口 $SERVICE_PORT 已被占用${NC}"
+        echo "请先停止占用该端口的服务"
+        exit 1
+    fi
+else
+    echo "  [OK] 端口 $SERVICE_PORT 可用"
+fi
 
 # 检查必需文件是否存在
 echo -e "${YELLOW}[2/7] 检查必需文件...${NC}"
-required_files=("$IMAGE_FILE" "docker-compose.yml" "pipeline.yaml")
+required_files=("$SELECTED_IMAGE_FILE" "docker-compose.yml" "pipeline.yaml")
 for file in "${required_files[@]}"; do
     if [ ! -f "$SCRIPT_DIR/$file" ]; then
         echo -e "${RED}错误: 找不到文件 $file${NC}"
@@ -78,8 +155,12 @@ cp -f "$SCRIPT_DIR/docker-compose.yml" "$INSTALL_DIR/"
 echo "  [OK] docker-compose.yml"
 cp -f "$SCRIPT_DIR/pipeline.yaml" "$INSTALL_DIR/"
 echo "  [OK] pipeline.yaml"
-cp -f "$SCRIPT_DIR/$IMAGE_FILE" "$INSTALL_DIR/"
-echo "  [OK] $IMAGE_FILE"
+cp -f "$SCRIPT_DIR/$SELECTED_IMAGE_FILE" "$INSTALL_DIR/"
+echo "  [OK] $SELECTED_IMAGE_FILE"
+
+# 保存当前安装的版本信息
+echo "$SELECTED_TAG" > "$INSTALL_DIR/.installed_tag"
+echo "  [OK] 记录安装版本: $SELECTED_TAG"
 
 if [ -d "$SCRIPT_DIR/cache" ]; then
     cp -rf "$SCRIPT_DIR/cache" "$INSTALL_DIR/"
@@ -92,8 +173,8 @@ fi
 # 加载 Docker 镜像
 echo -e "${YELLOW}[5/7] 加载 Docker 镜像...${NC}"
 echo "  这可能需要几分钟，请耐心等待..."
-if docker load -i "$INSTALL_DIR/$IMAGE_FILE"; then
-    echo -e "  ${GREEN}[OK] 镜像加载成功${NC}"
+if docker load -i "$INSTALL_DIR/$SELECTED_IMAGE_FILE"; then
+    echo -e "  ${GREEN}[OK] 镜像加载成功: paddlex-ocr:$SELECTED_TAG${NC}"
 else
     echo -e "${RED}错误: 镜像加载失败${NC}"
     exit 1
@@ -104,10 +185,11 @@ echo -e "${YELLOW}[6/7] 启动 PaddleX OCR 服务...${NC}"
 cd "$INSTALL_DIR"
 
 # 停止并删除旧容器（如果存在）
-docker stop paddlex-ocr 2>/dev/null || true
-docker rm paddlex-ocr 2>/dev/null || true
+docker stop "paddlex-ocr-$SELECTED_TAG" 2>/dev/null || true
+docker rm "paddlex-ocr-$SELECTED_TAG" 2>/dev/null || true
 
-if docker compose up -d; then
+# 使用环境变量启动对应版本的容器
+if PADDLEX_TAG="$SELECTED_TAG" docker compose up -d; then
     echo -e "  ${GREEN}[OK] 服务启动成功${NC}"
 else
     echo -e "${RED}错误: 服务启动失败${NC}"
@@ -132,13 +214,14 @@ echo -e "${GREEN}=====================================${NC}"
 echo -e "${GREEN}  安装完成！${NC}"
 echo -e "${GREEN}=====================================${NC}"
 echo ""
+echo "安装版本: paddlex-ocr:$SELECTED_TAG"
 echo "安装位置: $INSTALL_DIR"
 echo "服务地址: http://localhost:25601"
 echo ""
 echo "服务管理命令:"
-echo "  启动服务: cd $INSTALL_DIR && docker compose up -d"
-echo "  停止服务: cd $INSTALL_DIR && docker compose down"
-echo "  查看日志: cd $INSTALL_DIR && docker compose logs -f"
+echo "  启动服务: cd $INSTALL_DIR && PADDLEX_TAG=$SELECTED_TAG docker compose up -d"
+echo "  停止服务: cd $INSTALL_DIR && PADDLEX_TAG=$SELECTED_TAG docker compose down"
+echo "  查看日志: cd $INSTALL_DIR && PADDLEX_TAG=$SELECTED_TAG docker compose logs -f"
 echo "  查看状态: docker ps | grep paddlex-ocr"
 echo ""
 echo -e "${YELLOW}说明:${NC}"

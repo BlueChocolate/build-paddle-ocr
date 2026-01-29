@@ -1,7 +1,7 @@
 services:
   paddlex:
-    image: paddlex-ocr:latest
-    container_name: paddlex-ocr
+    image: paddlex-ocr:${PADDLEX_TAG:-hpi}
+    container_name: paddlex-ocr-${PADDLEX_TAG:-hpi}
     ports:
       - "25601:8080"
     extra_hosts:
