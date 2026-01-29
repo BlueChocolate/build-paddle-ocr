@@ -17,9 +17,7 @@ RUN pip install --no-cache-dir paddlepaddle==3.2.2 -i https://www.paddlepaddle.o
  && pip install --no-cache-dir paddlex[ocr]
 
 # 安装 PaddleX 服务化插件
-RUN paddlex --install serving \
- && paddlex --install paddle2onnx \
- && paddlex --install hpi-cpu
+RUN paddlex --install serving
 
 # 拷贝启动脚本
 COPY entrypoint.sh /entrypoint.sh
