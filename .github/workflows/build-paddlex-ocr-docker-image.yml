@@ -9,7 +9,6 @@ on:
       - 'Dockerfile'
       - '.github/workflows/build-paddlex-ocr-docker-image.yml'
       - 'entrypoint.sh'
-      - 'docker-compose.yml'
 
 jobs:
   build:

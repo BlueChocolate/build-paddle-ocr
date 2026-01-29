@@ -30,21 +30,37 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# 检查 Docker Compose 是否安装
-if ! command -v docker compose &> /dev/null && ! command -v docker-compose &> /dev/null; then
-    echo -e "${RED}错误: Docker Compose 未安装，请先安装 Docker Compose${NC}"
+# 检查 Docker Compose 是否安装（使用白名单方式检测）
+echo -e "${YELLOW}检查 Docker Compose...${NC}"
+COMPOSE_VERSION=$(docker compose version 2>/dev/null || true)
+if [[ "$COMPOSE_VERSION" == *"Docker Compose version"* ]]; then
+    echo -e "  ${GREEN}[OK] $COMPOSE_VERSION${NC}"
+else
+    echo -e "${RED}错误: Docker Compose 未安装或不可用${NC}"
+    echo "请确保已安装 Docker Compose 插件"
+    echo "安装方法: https://docs.docker.com/compose/install/"
     exit 1
 fi
 
+# 检查端口是否被占用
+echo -e "${YELLOW}[1/7] 检查端口占用...${NC}"
+SERVICE_PORT=25601
+if ss -tuln 2>/dev/null | grep -q ":$SERVICE_PORT " || netstat -tuln 2>/dev/null | grep -q ":$SERVICE_PORT "; then
+    echo -e "${RED}错误: 端口 $SERVICE_PORT 已被占用${NC}"
+    echo "请先停止占用该端口的服务，或修改 docker-compose.yml 中的端口配置"
+    exit 1
+fi
+echo "  [OK] 端口 $SERVICE_PORT 可用"
+
 # 检查必需文件是否存在
-echo -e "${YELLOW}[1/6] 检查必需文件...${NC}"
+echo -e "${YELLOW}[2/7] 检查必需文件...${NC}"
 required_files=("$IMAGE_FILE" "docker-compose.yml" "pipeline.yaml")
 for file in "${required_files[@]}"; do
     if [ ! -f "$SCRIPT_DIR/$file" ]; then
         echo -e "${RED}错误: 找不到文件 $file${NC}"
         exit 1
     fi
-    echo "  ✓ $file"
+    echo "  [OK] $file"
 done
 
 if [ ! -d "$SCRIPT_DIR/models" ]; then
@@ -52,59 +68,62 @@ if [ ! -d "$SCRIPT_DIR/models" ]; then
 fi
 
 # 创建安装目录
-echo -e "${YELLOW}[2/6] 创建安装目录...${NC}"
+echo -e "${YELLOW}[3/7] 创建安装目录...${NC}"
 mkdir -p "$INSTALL_DIR"
-echo "  ✓ 创建目录: $INSTALL_DIR"
+echo "  [OK] 创建目录: $INSTALL_DIR"
 
 # 复制文件到安装目录
-echo -e "${YELLOW}[3/6] 复制文件到安装目录...${NC}"
+echo -e "${YELLOW}[4/7] 复制文件到安装目录...${NC}"
 cp -f "$SCRIPT_DIR/docker-compose.yml" "$INSTALL_DIR/"
-echo "  ✓ docker-compose.yml"
+echo "  [OK] docker-compose.yml"
 cp -f "$SCRIPT_DIR/pipeline.yaml" "$INSTALL_DIR/"
-echo "  ✓ pipeline.yaml"
+echo "  [OK] pipeline.yaml"
 cp -f "$SCRIPT_DIR/$IMAGE_FILE" "$INSTALL_DIR/"
-echo "  ✓ $IMAGE_FILE"
+echo "  [OK] $IMAGE_FILE"
 
 if [ -d "$SCRIPT_DIR/models" ]; then
     cp -rf "$SCRIPT_DIR/models" "$INSTALL_DIR/"
-    echo "  ✓ models/"
+    echo "  [OK] models/"
 else
     mkdir -p "$INSTALL_DIR/models"
-    echo "  ✓ 创建空的 models/"
+    echo "  [OK] 创建空的 models/"
 fi
 
 # 加载 Docker 镜像
-echo -e "${YELLOW}[4/6] 加载 Docker 镜像...${NC}"
+echo -e "${YELLOW}[5/7] 加载 Docker 镜像...${NC}"
 echo "  这可能需要几分钟，请耐心等待..."
 if docker load -i "$INSTALL_DIR/$IMAGE_FILE"; then
-    echo -e "  ${GREEN}✓ 镜像加载成功${NC}"
-    # 加载完成后删除 tar 文件以节省空间
-    rm -f "$INSTALL_DIR/$IMAGE_FILE"
-    echo "  ✓ 已删除镜像文件以节省空间"
+    echo -e "  ${GREEN}[OK] 镜像加载成功${NC}"
 else
     echo -e "${RED}错误: 镜像加载失败${NC}"
     exit 1
 fi
 
-# 启动 Docker Compose 服务
-echo -e "${YELLOW}[5/6] 启动 PaddleX OCR 服务...${NC}"
+# 启动 Docker 服务
+echo -e "${YELLOW}[6/7] 启动 PaddleX OCR 服务...${NC}"
 cd "$INSTALL_DIR"
-if command -v docker compose &> /dev/null; then
-    docker compose up -d
+
+# 停止并删除旧容器（如果存在）
+docker stop paddlex-ocr 2>/dev/null || true
+docker rm paddlex-ocr 2>/dev/null || true
+
+if docker compose up -d; then
+    echo -e "  ${GREEN}[OK] 服务启动成功${NC}"
 else
-    docker-compose up -d
+    echo -e "${RED}错误: 服务启动失败${NC}"
+    echo "请检查 docker-compose.yml 配置或查看日志: docker compose logs"
+    exit 1
 fi
-echo -e "  ${GREEN}✓ 服务启动成功${NC}"
 
 # 启用 Docker 开机自启
-echo -e "${YELLOW}[6/6] 配置 Docker 开机自启...${NC}"
+echo -e "${YELLOW}[7/7] 配置 Docker 开机自启...${NC}"
 if systemctl is-enabled docker &> /dev/null; then
-    echo "  ✓ Docker 服务已设置为开机自启"
+    echo "  [OK] Docker 服务已设置为开机自启"
 else
     if systemctl enable docker; then
-        echo -e "  ${GREEN}✓ 已启用 Docker 开机自启${NC}"
+        echo -e "  ${GREEN}[OK] 已启用 Docker 开机自启${NC}"
     else
-        echo -e "  ${YELLOW}⚠ 无法启用 Docker 开机自启，请手动配置${NC}"
+        echo -e "  ${YELLOW}[WARN] 无法启用 Docker 开机自启，请手动配置${NC}"
     fi
 fi
 

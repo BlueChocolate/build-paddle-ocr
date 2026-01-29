@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   paddlex:
     image: paddlex-ocr:latest
@@ -7,9 +5,10 @@ services:
     ports:
       - "25601:8080"
     volumes:
-      - ./models:/data/models
-      - ./pipeline.yaml:/data/pipeline.yaml
+      - /opt/qzwb/paddlex-ocr/paddlex:/root/.paddlex
+      - /opt/qzwb/paddlex-ocr/pipeline.yaml:/data/pipeline.yaml
     environment:
+      DISABLE_MODEL_SOURCE_CHECK: "True"
       PIPELINE_FILE: /data/pipeline.yaml
       DEFAULT_PIPELINE: OCR
       DEVICE: cpu

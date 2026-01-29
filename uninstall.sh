@@ -36,11 +36,7 @@ fi
 echo -e "${YELLOW}[1/4] 停止并删除容器...${NC}"
 if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/docker-compose.yml" ]; then
     cd "$INSTALL_DIR"
-    if command -v docker compose &> /dev/null; then
-        docker compose down 2>/dev/null || echo "  容器可能已经停止"
-    else
-        docker-compose down 2>/dev/null || echo "  容器可能已经停止"
-    fi
+    docker compose down 2>/dev/null || echo "  容器可能已经停止"
     echo -e "  ${GREEN}✓ 容器已停止并删除${NC}"
 else
     # 如果 docker-compose.yml 不存在，直接删除容器
