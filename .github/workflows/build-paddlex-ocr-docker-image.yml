@@ -15,11 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - variant: basic
-            enable_hpi: "false"
-          - variant: hpi
-            enable_hpi: "true"
+        mode: [basic, hpi]
 
     steps:
       - name: Checkout repository
@@ -31,31 +27,31 @@ jobs:
       - name: Cache Docker layers
         uses: actions/cache@v5
         with:
-          path: /tmp/.buildx-cache-${{ matrix.variant }}
-          key: ${{ runner.os }}-buildx-${{ matrix.variant }}-${{ hashFiles('Dockerfile') }}
+          path: /tmp/.buildx-cache-${{ matrix.mode }}
+          key: ${{ runner.os }}-buildx-${{ matrix.mode }}-${{ hashFiles('Dockerfile') }}
           restore-keys: |
-            ${{ runner.os }}-buildx-${{ matrix.variant }}-
+            ${{ runner.os }}-buildx-${{ matrix.mode }}-
 
-      - name: Build Docker image (${{ matrix.variant }})
+      - name: Build Docker image (${{ matrix.mode }})
         run: |
           docker buildx build \
-            --build-arg ENABLE_HPI=${{ matrix.enable_hpi }} \
-            -t paddlex-ocr:${{ matrix.variant }} \
-            --cache-from=type=local,src=/tmp/.buildx-cache-${{ matrix.variant }} \
-            --cache-to=type=local,dest=/tmp/.buildx-cache-${{ matrix.variant }}-new,mode=max \
+            --build-arg MODE=${{ matrix.mode }} \
+            -t paddlex-ocr:${{ matrix.mode }} \
+            --cache-from=type=local,src=/tmp/.buildx-cache-${{ matrix.mode }} \
+            --cache-to=type=local,dest=/tmp/.buildx-cache-${{ matrix.mode }}-new,mode=max \
             --load \
             .
 
       - name: Move cache
         run: |
-          rm -rf /tmp/.buildx-cache-${{ matrix.variant }}
-          mv /tmp/.buildx-cache-${{ matrix.variant }}-new /tmp/.buildx-cache-${{ matrix.variant }}
+          rm -rf /tmp/.buildx-cache-${{ matrix.mode }}
+          mv /tmp/.buildx-cache-${{ matrix.mode }}-new /tmp/.buildx-cache-${{ matrix.mode }}
 
       - name: Export Docker image as tar
-        run: docker save paddlex-ocr:${{ matrix.variant }} -o paddlex-ocr-${{ matrix.variant }}.tar
+        run: docker save paddlex-ocr:${{ matrix.mode }} -o paddlex-ocr-${{ matrix.mode }}.tar
 
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: paddlex-ocr-${{ matrix.variant }}
-          path: paddlex-ocr-${{ matrix.variant }}.tar
+          name: paddlex-ocr-${{ matrix.mode }}
+          path: paddlex-ocr-${{ matrix.mode }}.tar
